@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Perené Inmersivo - Audioguía AR</title>
+    <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
+    <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
+    <style>
+        body { margin: 0; overflow: hidden; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        #info-panel {
+            position: fixed; bottom: 20px; left: 5%; width: 90%;
+            background: rgba(15, 23, 42, 0.95); color: white;
+            padding: 18px; border-radius: 16px; z-index: 1000;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.4);
+            box-sizing: border-box; border: 1px solid rgba(56, 189, 248, 0.3);
+        }
+        .header-flex { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+        h2 { margin: 0; font-size: 18px; color: #38bdf8; }
+        p { margin: 0 0 12px 0; font-size: 13px; color: #cbd5e1; line-height: 1.4; }
+        .badge { background: #10b981; color: white; padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: bold; }
+        
+        /* Selector de idiomas y controles */
+        .controls-row { display: flex; gap: 6px; margin-bottom: 10px; align-items: center; justify-content: space-between; }
+        .lang-btns { display: flex; gap: 4px; }
+        .lang-btn { background: #334155; color: #cbd5e1; border: none; padding: 4px 8px; border-radius: 6px; cursor: pointer; font-size: 11px; font-weight: bold; }
+        .lang-btn.active { background: #0284c7; color: white; }
+        .audio-btn { background: #f59e0b; color: #0f172a; border: none; padding: 4px 10px; border-radius: 6px; cursor: pointer; font-size: 11px; font-weight: bold; display: flex; align-items: center; gap: 4px; }
+        
+        .report-box { display: flex; gap: 8px; }
+        input { flex: 1; padding: 8px 12px; border-radius: 8px; border: 1px solid #475569; background: #1e293b; color: white; font-size: 13px; }
+        input:focus { outline: none; border-color: #38bdf8; }
+        button.send-btn { background: #0284c7; color: white; border: none; padding: 8px 14px; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 13px; }
+        button.send-btn:hover { background: #0369a1; }
+    </style>
+</head>
+<body>
+    <div id="info-panel">
+        <div class="controls-row">
+            <div class="lang-btns">
+                <button class="lang-btn active" id="btn-es" onclick="cambiarIdioma('es')">ES</button>
+                <button class="lang-btn" id="btn-en" onclick="cambiarIdioma('en')">EN</button>
+                <button class="lang-btn" id="btn-ash" onclick="cambiarIdioma('ash')">ASHÁNINKA</button>
+            </div>
+            <button class="audio-btn" onclick="reproducirAudio()">🔊 Escuchar Guía</button>
+        </div>
+
+        <div class="header-flex">
+            <h2 id="titulo">Cargando atractivo...</h2>
+            <span class="badge" id="estado">Conectando</span>
+        </div>
+        <p id="descripcion">Espere un momento...</p>
+        
+        <div class="report-box">
+            <input type="text" id="mensaje-reporte" placeholder="Deja una sugerencia para la Muni...">
+            <button class="send-btn" onclick="enviarReporte()">Enviar</button>
+        </div>
+    </div>
+
+    <a-scene embedded arjs="sourceType: webcam; debugUIEnabled: false; trackingMethod: best;">
+        <a-marker preset="hiro">
+            <a-entity id="modelo-3d" position="0 0 0" scale="0.6 0.6 0.6" animation="property: rotation; to: 0 360 0; loop: true; dur: 10000"></a-entity>
+        </a-marker>
+        <a-entity camera></a-entity>
+    </a-scene>
+
+    <script>
+        const API_URL = "http://127.0.0.1:8000/api";
+        const params = new URLSearchParams(window.location.search);
+        const codigoLugar = params.get("lugar") || "BAYOZ";
+        let idiomaActual = "es";
+        let textoDescriptivoActual = "";
+
+        async function cargarAtractivo(lang = "es") {
+            idiomaActual = lang;
+            
+            // Actualizar estilo visual de botones de idioma
+            document.querySelectorAll(".lang-btn").forEach(b => b.classList.remove("active"));
+            document.getElementById(`btn-${lang}`).classList.add("active");
+
+            try {
+                const res = await fetch(`${API_URL}/atractivo/${codigoLugar}?lang=${lang}`);
+                const data = await res.json();
+                if (data.error) {
+                    document.getElementById("titulo").innerText = "Lugar no encontrado";
+                    document.getElementById("descripcion").innerText = "El código ingresado no existe en el registro municipal.";
+                    return;
+                }
+                document.getElementById("titulo").innerText = data.nombre;
+                document.getElementById("descripcion").innerText = data.descripcion;
+                textoDescriptivoActual = data.descripcion;
+                document.getElementById("estado").innerText = data.estado;
+                document.getElementById("modelo-3d").setAttribute("gltf-model", data.modelo_url);
+            } catch (e) {
+                document.getElementById("titulo").innerText = "Error de servidor";
+                document.getElementById("descripcion").innerText = "No se pudo conectar con la base de datos local.";
+            }
+        }
+
+        function cambiarIdioma(lang) {
+            cargarAtractivo(lang);
+        }
+
+        function reproducirAudio() {
+            if (!textoDescriptivoActual) return;
+            // Usar el sintetizador de voz nativo del navegador web
+            const synth = window.speechSynthesis;
+            synth.cancel(); // Detener audio anterior si hubiera
+            
+            const utterThis = new SpeechSynthesisUtterance(textoDescriptivoActual);
+            utterThis.lang = idiomaActual === "en" ? "en-US" : "es-ES";
+            synth.speak(utterThis);
+        }
+
+        async function enviarReporte() {
+            const input = document.getElementById("mensaje-reporte");
+            if (!input.value.trim()) return;
+            
+            try {
+                await fetch(`${API_URL}/reporte`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ atractivo_codigo: codigoLugar, mensaje: input.value })
+                });
+                alert("¡Reporte enviado con éxito al panel de la Municipalidad!");
+                input.value = "";
+            } catch (err) {
+                alert("Error al enviar el reporte.");
+            }
+        }
+
+        cargarAtractivo(idiomaActual);
+    </script>
+</body>
+</html>

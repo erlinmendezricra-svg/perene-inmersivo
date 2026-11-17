@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Panel Municipal - Perené Inmersivo</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #0f172a; color: #f8fafc; padding: 30px; margin: 0; }
+        .container { max-width: 1000px; margin: 0 auto; }
+        header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; border-bottom: 1px solid #334155; padding-bottom: 15px; }
+        h1 { font-size: 22px; color: #38bdf8; margin: 0; }
+        .card { background: #1e293b; padding: 25px; border-radius: 14px; box-shadow: 0 4px 15px rgba(0,0,0,0.3); margin-bottom: 25px; border: 1px solid #334155; }
+        h2 { font-size: 16px; color: #94a3b8; margin-top: 0; margin-bottom: 15px; text-transform: uppercase; letter-spacing: 0.5px; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { text-align: left; padding: 12px; border-bottom: 1px solid #334155; font-size: 14px; }
+        th { background: #0f172a; color: #38bdf8; font-weight: 600; }
+        td { color: #cbd5e1; }
+        .badge-code { background: #0284c7; color: white; padding: 4px 8px; border-radius: 6px; font-weight: bold; }
+        .refresh-note { font-size: 12px; color: #64748b; text-align: right; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🏛️ Municipalidad Distrital de Perené</h1>
+            <span style="font-size: 13px; color: #10b981; font-weight: bold;">● Sistema Activo en Vivo</span>
+        </header>
+        
+        <div class="card">
+            <h2>📊 Escaneos de Realidad Aumentada por Atractivo</h2>
+            <table>
+                <thead>
+                    <tr><th>Código</th><th>Atractivo Turístico / Zona</th><th>Total de Interacciones</th></tr>
+                </thead>
+                <tbody id="tabla-visitas">
+                    <tr><td colspan="3" style="text-align: center; color: #64748b;">Cargando datos...</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div class="card">
+            <h2>💬 Reportes y Sugerencias de Ciudadanos / Turistas</h2>
+            <table>
+                <thead>
+                    <tr><th>Lugar</th><th>Mensaje del Usuario</th><th>Fecha y Hora</th></tr>
+                </thead>
+                <tbody id="tabla-reportes">
+                    <tr><td colspan="3" style="text-align: center; color: #64748b;">No hay reportes registrados aún.</td></tr>
+                </tbody>
+            </table>
+            <div class="refresh-note">Actualización automática cada 3 segundos</div>
+        </div>
+    </div>
+
+    <script>
+        const nombresLugares = {
+            "BAYOZ": "Catarata Bayoz",
+            "VELO": "Catarata Velo de la Novia",
+            "PAMPA": "Comunidad Nativa Pampa Michi",
+            "MIRADOR": "Mirador Turístico de Perené"
+        };
+
+        async function actualizarDashboard() {
+            try {
+                const res = await fetch("http://127.0.0.1:8000/api/estadisticas");
+                const data = await res.json();
+
+                // Tabla de visitas
+                const tbodyVisitas = document.getElementById("tabla-visitas");
+                if (data.visitas_por_lugar.length === 0) {
+                    tbodyVisitas.innerHTML = `<tr><td colspan="3" style="text-align: center; color: #64748b;">Aún no hay escaneos registrados.</td></tr>`;
+                } else {
+                    tbodyVisitas.innerHTML = data.visitas_por_lugar.map(v => `
+                        <tr>
+                            <td><span class="badge-code">${v.atractivo_codigo}</span></td>
+                            <td><strong>${nombresLugares[v.atractivo_codigo] || v.atractivo_codigo}</strong></td>
+                            <td><span style="color: #38bdf8; font-weight: bold;">${v.total}</span> visitas</td>
+                        </tr>
+                    `).join("");
+                }
+
+                // Tabla de reportes
+                const tbodyReportes = document.getElementById("tabla-reportes");
+                if (data.reportes.length === 0) {
+                    tbodyReportes.innerHTML = `<tr><td colspan="3" style="text-align: center; color: #64748b;">No hay reportes registrados aún.</td></tr>`;
+                } else {
+                    tbodyReportes.innerHTML = data.reportes.map(r => `
+                        <tr>
+                            <td><span class="badge-code">${r.atractivo_codigo}</span></td>
+                            <td>${r.mensaje}</td>
+                            <td style="color: #94a3b8; font-size: 12px;">${r.fecha_hora}</td>
+                        </tr>
+                    `).join("");
+                }
+            } catch (e) {
+                console.error("Error al conectar con el servidor backend.");
+            }
+        }
+
+        actualizarDashboard();
+        setInterval(actualizarDashboard, 3000);
+    </script>
+</body>
+</html>
